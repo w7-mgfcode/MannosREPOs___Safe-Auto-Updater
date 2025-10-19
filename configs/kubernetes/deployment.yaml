@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: safe-auto-updater
+  namespace: default
+  labels:
+    app: safe-auto-updater
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: safe-auto-updater
+  template:
+    metadata:
+      labels:
+        app: safe-auto-updater
+    spec:
+      serviceAccountName: safe-auto-updater
+      containers:
+      - name: safe-auto-updater
+        image: safe-auto-updater:latest
+        imagePullPolicy: Always
+        env:
+        - name: CONFIG_PATH
+          value: /app/configs/config.yaml
+        - name: LOG_LEVEL
+          value: INFO
+        volumeMounts:
+        - name: config
+          mountPath: /app/configs
+          readOnly: true
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: config
+        configMap:
+          name: safe-auto-updater-config
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: safe-auto-updater
+  namespace: default
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: safe-auto-updater
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "deployments"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: safe-auto-updater
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: safe-auto-updater
+subjects:
+- kind: ServiceAccount
+  name: safe-auto-updater
+  namespace: default

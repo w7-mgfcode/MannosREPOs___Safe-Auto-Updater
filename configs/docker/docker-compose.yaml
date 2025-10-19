@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # Safe Auto-Updater service
+  safe-auto-updater:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    container_name: safe-auto-updater
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./configs:/app/configs:ro
+      - ./logs:/var/log/safe-auto-updater
+    environment:
+      - CONFIG_PATH=/app/configs/config.yaml
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    networks:
+      - updater-network
+
+  # Watchtower for Docker updates
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_INCLUDE_RESTARTING=true
+      - WATCHTOWER_ROLLING_RESTART=true
+      - WATCHTOWER_MONITOR_ONLY=true
+      - WATCHTOWER_HTTP_API_UPDATE=true
+      - WATCHTOWER_HTTP_API_TOKEN=your-secure-token
+    restart: unless-stopped
+    networks:
+      - updater-network
+    ports:
+      - "8080:8080"
+
+networks:
+  updater-network:
+    driver: bridge
