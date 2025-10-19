@@ -1,0 +1,102 @@
+# Safe Auto-Updater Configuration
+
+# Enable/disable components
+enable_docker: true
+enable_kubernetes: true
+enable_watchtower: false
+
+# Docker configuration
+docker:
+  # Docker socket path
+  socket: /var/run/docker.sock
+  # Registries to monitor
+  registries:
+    - name: docker.io
+      auth: false
+    - name: gcr.io
+      auth: false
+
+# Kubernetes configuration
+kubernetes:
+  # Namespace to monitor (default: all namespaces)
+  namespace: default
+  # Kubeconfig path (leave empty to use in-cluster config)
+  kubeconfig: ""
+  # Monitor specific labels
+  labels:
+    auto-update: "enabled"
+
+# Semantic Version evaluation rules
+semver:
+  # Allow major version updates (x.0.0)
+  allow_major_updates: false
+  # Allow minor version updates (0.x.0)
+  allow_minor_updates: true
+  # Allow patch version updates (0.0.x)
+  allow_patch_updates: true
+
+# Diff evaluation rules
+diff:
+  # Maximum number of file changes allowed
+  max_file_changes: 100
+  # Paths that block updates if changed
+  blocked_paths:
+    - /etc/security
+    - /etc/ssl
+
+# Health check configuration
+health_check:
+  # Timeout in seconds
+  timeout: 60
+  # Interval between checks in seconds
+  interval: 5
+  # Number of retries before considering failed
+  retries: 3
+
+# Update execution settings
+update:
+  # Enable automatic updates
+  auto_update: true
+  # Enable automatic rollback on failure
+  auto_rollback: true
+  # Wait for health checks before proceeding
+  wait_for_health: true
+  # Backup before update
+  create_backup: true
+
+# Watchtower configuration
+watchtower:
+  # Watchtower API endpoint
+  endpoint: http://localhost:8080
+  # Update interval (cron format)
+  schedule: "0 0 * * *"
+  # Only monitor specific containers
+  include_stopped: false
+  # Labels to monitor
+  labels:
+    - "com.centurylinklabs.watchtower.enable=true"
+
+# Notification settings
+notifications:
+  # Enable notifications
+  enabled: false
+  # Notification channels
+  channels:
+    - type: email
+      enabled: false
+      smtp_host: smtp.example.com
+      smtp_port: 587
+      from: updater@example.com
+      to:
+        - admin@example.com
+    - type: slack
+      enabled: false
+      webhook_url: https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+
+# Logging configuration
+logging:
+  level: INFO
+  # Log file path (leave empty for console only)
+  file: ""
+  # Log format
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

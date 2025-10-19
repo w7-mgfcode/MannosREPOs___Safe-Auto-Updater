@@ -1,0 +1,152 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: safe-auto-updater
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: safe-auto-updater
+  namespace: safe-auto-updater
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: safe-auto-updater
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: safe-auto-updater
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: safe-auto-updater
+subjects:
+  - kind: ServiceAccount
+    name: safe-auto-updater
+    namespace: safe-auto-updater
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: safe-auto-updater-config
+  namespace: safe-auto-updater
+data:
+  config.yaml: |
+    enable_docker: false
+    enable_kubernetes: true
+    
+    kubernetes:
+      namespace: default
+      labels:
+        auto-update: "enabled"
+    
+    semver:
+      allow_major_updates: false
+      allow_minor_updates: true
+      allow_patch_updates: true
+    
+    health_check:
+      timeout: 60
+      interval: 5
+      retries: 3
+    
+    update:
+      auto_update: true
+      auto_rollback: true
+      wait_for_health: true
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: safe-auto-updater
+  namespace: safe-auto-updater
+  labels:
+    app: safe-auto-updater
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: safe-auto-updater
+  template:
+    metadata:
+      labels:
+        app: safe-auto-updater
+    spec:
+      serviceAccountName: safe-auto-updater
+      containers:
+        - name: safe-auto-updater
+          image: safe-auto-updater:latest
+          imagePullPolicy: Always
+          env:
+            - name: CONFIG_PATH
+              value: /app/configs/config.yaml
+            - name: LOG_LEVEL
+              value: INFO
+          volumeMounts:
+            - name: config
+              mountPath: /app/configs
+              readOnly: true
+            - name: logs
+              mountPath: /app/logs
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import sys; sys.exit(0)"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import sys; sys.exit(0)"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: safe-auto-updater-config
+        - name: logs
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: safe-auto-updater
+  namespace: safe-auto-updater
+spec:
+  selector:
+    app: safe-auto-updater
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
