@@ -30,7 +30,7 @@ services:
       - WATCHTOWER_ROLLING_RESTART=true
       - WATCHTOWER_MONITOR_ONLY=true
       - WATCHTOWER_HTTP_API_UPDATE=true
-      - WATCHTOWER_HTTP_API_TOKEN=your-secure-token
+      - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_API_TOKEN:-change-this-token}
     restart: unless-stopped
     networks:
       - updater-network

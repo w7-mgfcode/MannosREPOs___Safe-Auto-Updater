@@ -14,15 +14,17 @@ logger = logging.getLogger(__name__)
 class HelmUpdater:
     """Manages Helm release updates."""
 
-    def __init__(self, namespace: str = "default"):
+    def __init__(self, namespace: str = "default", timeout: str = "5m"):
         """
         Initialize Helm updater.
 
         Args:
             namespace: Kubernetes namespace for Helm operations
+            timeout: Timeout for Helm operations (e.g., '5m', '10m')
         """
         self.namespace = namespace
-        logger.info(f"HelmUpdater initialized for namespace: {namespace}")
+        self.timeout = timeout
+        logger.info(f"HelmUpdater initialized for namespace: {namespace} with timeout: {timeout}")
 
     def upgrade_release(self, release_name: str, chart_version: Optional[str] = None,
                        chart_name: Optional[str] = None, values_file: Optional[str] = None) -> bool:
@@ -52,7 +54,7 @@ class HelmUpdater:
             if values_file:
                 cmd.extend(["--values", values_file])
             
-            cmd.extend(["--wait", "--timeout", "5m"])
+            cmd.extend(["--wait", "--timeout", self.timeout])
 
             logger.info(f"Executing Helm upgrade: {' '.join(cmd)}")
             

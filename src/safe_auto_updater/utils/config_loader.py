@@ -52,10 +52,10 @@ class ConfigLoader:
 
             # Load based on file extension
             if config_file.suffix in ['.yaml', '.yml']:
-                with open(config_file, 'r') as f:
+                with open(config_file, 'r', encoding='utf-8') as f:
                     self.config = yaml.safe_load(f) or {}
             elif config_file.suffix == '.json':
-                with open(config_file, 'r') as f:
+                with open(config_file, 'r', encoding='utf-8') as f:
                     self.config = json.load(f)
             else:
                 logger.error(f"Unsupported configuration format: {config_file.suffix}")

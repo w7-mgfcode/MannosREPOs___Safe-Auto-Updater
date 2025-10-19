@@ -10,15 +10,19 @@ import re
 
 logger = logging.getLogger(__name__)
 
+# Semantic Versioning 2.0.0 regex pattern
+# Matches: v?MAJOR.MINOR.PATCH[-PRERELEASE][+BUILD]
+SEMVER_PATTERN = re.compile(
+    r'^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$'
+)
+
 
 class SemVerEvaluator:
     """Evaluates semantic versioning for update decisions."""
 
     def __init__(self):
         """Initialize SemVer evaluator."""
-        self.semver_pattern = re.compile(
-            r'^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$'
-        )
+        self.semver_pattern = SEMVER_PATTERN
         logger.info("SemVerEvaluator initialized")
 
     def parse_version(self, version: str) -> Optional[Tuple[int, int, int]]:
