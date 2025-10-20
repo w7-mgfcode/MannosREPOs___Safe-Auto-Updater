@@ -485,6 +485,73 @@ safe-updater update my-app --to-version 2.0.0 --force
 
 ---
 
+### 3.8 serve
+
+**Purpose**: Start the REST API server
+
+#### Syntax
+```bash
+safe-updater serve [OPTIONS]
+```
+
+#### Options
+
+| Option | Short | Type | Default | Description |
+|--------|-------|------|---------|-------------|
+| `--host` | - | text | `0.0.0.0` | Host to bind to |
+| `--port` | - | integer | `8000` | Port to bind to |
+| `--workers` | - | integer | `1` | Number of worker processes |
+| `--reload` | - | flag | `False` | Enable auto-reload (development) |
+
+#### Examples
+
+```bash
+# Start with defaults
+safe-updater serve
+
+# Custom host and port
+safe-updater serve --host 127.0.0.1 --port 9000
+
+# Development mode with auto-reload
+safe-updater serve --reload
+
+# Production with multiple workers
+safe-updater serve --workers 4
+```
+
+#### Output
+
+```
+============================================================
+Safe Auto-Updater API Server
+============================================================
+Host:     0.0.0.0:8000
+Docs:     http://0.0.0.0:8000/api/docs
+Health:   http://0.0.0.0:8000/api/v1/health
+Metrics:  http://0.0.0.0:8000/api/v1/metrics
+Workers:  4
+Reload:   False
+============================================================
+
+INFO:     Started server process [12345]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000
+```
+
+#### API Endpoints
+
+Once started, the API provides:
+- **Interactive Docs**: http://localhost:8000/api/docs
+- **Health Check**: http://localhost:8000/api/v1/health
+- **Metrics**: http://localhost:8000/api/v1/metrics
+- **Assets API**: http://localhost:8000/api/v1/assets/
+- **Updates API**: http://localhost:8000/api/v1/updates/
+
+See [API_SERVER.md](API_SERVER.md) for complete API documentation.
+
+---
+
 ### 3.9 rollback
 
 **Purpose**: Rollback a failed update (future feature)

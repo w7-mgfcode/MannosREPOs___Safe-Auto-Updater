@@ -18,8 +18,10 @@ A production-ready Safe Auto-Updater system that inventories Docker/Kubernetes a
 - **Safe Updates**: Multi-layer health checks and automatic rollback on failure
 - **Helm Integration**: Safe Helm release updates with validation
 - **Watchtower Support**: Optional integration for standalone Docker containers
+- **REST API Server**: FastAPI-based REST API for programmatic access
+- **Prometheus Metrics**: Built-in metrics export for monitoring (20+ metrics)
 - **Audit Logging**: Complete audit trail of all update operations
-- **Prometheus Metrics**: Built-in metrics export for monitoring
+- **Interactive Documentation**: Swagger UI and ReDoc for API exploration
 
 ## Installation
 
@@ -84,6 +86,19 @@ python -m src.main compare 1.0.0 1.0.1
 
 ```bash
 python -m src.main evaluate 1.0.0 2.0.0
+```
+
+### 6. Start REST API Server
+
+```bash
+# Start with defaults (port 8000)
+python -m src.main serve
+
+# Production with multiple workers
+python -m src.main serve --workers 4
+
+# Access interactive documentation
+# Open http://localhost:8000/api/docs in your browser
 ```
 
 ## Configuration
