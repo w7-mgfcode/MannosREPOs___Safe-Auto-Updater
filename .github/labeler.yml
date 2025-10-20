@@ -1,0 +1,46 @@
+# Labeler configuration for path-based auto-labeling
+
+feature:
+  - changed-files:
+    - any-glob-to-any-file: 'src/**/*.py'
+
+bugfix:
+  - changed-files:
+    - any-glob-to-any-file: 'src/**/fix_*.py'
+
+security:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/config/**/*.py'
+      - 'src/rollback/**/*.py'
+      - '.github/workflows/security.yml'
+
+documentation:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'docs/**/*.md'
+      - '*.md'
+      - 'README.md'
+      - 'CLAUDE.md'
+
+tests:
+  - changed-files:
+    - any-glob-to-any-file: 'tests/**/*.py'
+
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'requirements.txt'
+      - 'setup.py'
+      - 'Dockerfile'
+
+config:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'config/**/*.yaml'
+      - 'config/**/*.yml'
+      - '.coderabbit.yaml'
+
+ci-cd:
+  - changed-files:
+    - any-glob-to-any-file: '.github/workflows/*.yml'
