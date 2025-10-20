@@ -15,6 +15,9 @@ from inventory.docker_scanner import DockerScanner
 from inventory.k8s_scanner import KubernetesScanner
 from detection.semver_analyzer import SemVerAnalyzer
 from detection.diff_gate import DiffGate
+from updater.helm_updater import HelmUpdater
+from health.health_checker import HealthChecker
+from rollback.rollback_manager import RollbackManager
 
 console = Console()
 
@@ -236,6 +239,243 @@ def validate_config(config_file):
     except Exception as e:
         console.print(f"[red]✗[/red] Configuration validation failed: {e}")
         sys.exit(1)
+
+
+@cli.command()
+@click.option('--host', default='0.0.0.0', help='Host to bind to')
+@click.option('--port', default=8000, type=int, help='Port to bind to')
+@click.option('--workers', default=1, type=int, help='Number of worker processes')
+@click.option('--reload', is_flag=True, help='Enable auto-reload (development)')
+@click.pass_context
+def serve(ctx, host, port, workers, reload):
+    """Start the REST API server."""
+    console.print("[bold blue]Starting Safe Auto-Updater API Server...[/bold blue]")
+    
+    try:
+        from api.server import start_server
+        
+        config_path = ctx.obj.get('config_path')
+        
+        start_server(
+            host=host,
+            port=port,
+            config_path=config_path,
+            reload=reload,
+            workers=workers if not reload else 1  # Single worker in reload mode
+        )
+    except ImportError as e:
+        console.print(f"[red]✗[/red] Failed to import API server: {e}")
+        console.print("[yellow]Make sure FastAPI and uvicorn are installed:[/yellow]")
+        console.print("  pip install 'fastapi>=0.109.0' 'uvicorn[standard]>=0.27.0'")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]✗[/red] Failed to start server: {e}")
+        sys.exit(1)
+
+
+def main():
+    """Main entry point."""
+    cli(obj={})
+
+
+if __name__ == '__main__':
+    main()
+
+
+@cli.command()
+@click.argument('asset_name')
+@click.option('--to-version', required=True, help='Target version')
+@click.option('--namespace', '-n', default='default', help='Kubernetes namespace')
+@click.option('--dry-run', is_flag=True, help='Simulate without executing')
+@click.option('--force', is_flag=True, help='Skip policy gates')
+@click.option('--wait', is_flag=True, default=True, help='Wait for completion')
+@click.option('--timeout', default=300, help='Timeout in seconds')
+@click.pass_context
+def update(ctx, asset_name, to_version, namespace, dry_run, force, wait, timeout):
+    """Execute update for specified asset."""
+    console.print(f"[bold blue]Updating {asset_name} to version {to_version}[/bold blue]")
+
+    config = load_config(ctx.obj.get('config_path'))
+    state_manager = StateManager()
+
+    # Get asset from inventory
+    assets = state_manager.list_assets()
+    asset = next((a for a in assets if a.name == asset_name and a.namespace == namespace), None)
+
+    if not asset:
+        console.print(f"[red]✗[/red] Asset {asset_name} not found in namespace {namespace}")
+        console.print("[yellow]Tip: Run 'safe-updater scan' first to discover assets[/yellow]")
+        sys.exit(1)
+
+    # Evaluate policy (unless forced)
+    if not force:
+        diff_gate = DiffGate(semver_gates=config.auto_update.semver_gates)
+        decision = diff_gate.evaluate_update(asset.current_version, to_version)
+
+        console.print(f"\n[bold]Policy Evaluation:[/bold]")
+        console.print(f"  Current version: {asset.current_version}")
+        console.print(f"  Target version:  {to_version}")
+        console.print(f"  Change type:     {decision['change_type']}")
+        console.print(f"  Decision:        {decision['decision']}")
+        console.print(f"  Reason:          {decision['reason']}")
+
+        if decision['decision'] not in ['approve', 'review_required']:
+            console.print(f"\n[red]✗[/red] Update blocked by policy")
+            console.print(f"[yellow]Use --force to override (not recommended)[/yellow]")
+            sys.exit(10)  # Policy violation exit code
+        elif decision['decision'] == 'review_required':
+            console.print(f"\n[yellow]⚠[/yellow] Review required but proceeding...")
+
+    # Initialize updater
+    try:
+        helm_updater = HelmUpdater()
+    except FileNotFoundError as e:
+        console.print(f"[red]✗[/red] {e}")
+        sys.exit(1)
+
+    # Execute update
+    console.print(f"\n[yellow]{'Simulating' if dry_run else 'Executing'} Helm upgrade...[/yellow]")
+
+    # Extract chart from asset metadata (if available)
+    chart = asset.metadata.get('chart', asset.name)
+
+    result = helm_updater.upgrade(
+        release=asset_name,
+        chart=chart,
+        version=to_version,
+        namespace=namespace,
+        dry_run=dry_run,
+        atomic=True,
+        timeout=timeout,
+        wait=wait
+    )
+
+    if result.success:
+        console.print(f"[green]✓[/green] {result.message}")
+        console.print(f"  Revision: {result.revision}")
+        console.print(f"  Duration: {result.duration_seconds:.1f}s")
+
+        if not dry_run:
+            # Update state
+            state_manager.update_version(asset.id, to_version)
+            state_manager.update_status(asset.id, "active")
+
+            # Health monitoring
+            console.print(f"\n[yellow]Monitoring health for {config.auto_update.rollback.monitoring_duration}s...[/yellow]")
+
+            # Initialize health checker
+            from kubernetes import client, config as k8s_config
+            try:
+                if config.kubernetes.in_cluster:
+                    k8s_config.load_incluster_config()
+                else:
+                    k8s_config.load_kube_config(config_file=config.kubernetes.kubeconfig_path)
+
+                apps_api = client.AppsV1Api()
+                core_api = client.CoreV1Api()
+                health_checker = HealthChecker(k8s_apps_api=apps_api, k8s_core_api=core_api)
+
+                # Create rollback manager
+                rollback_manager = RollbackManager(
+                    config=config.auto_update.rollback,
+                    helm_updater=helm_updater
+                )
+
+                # Monitor and potentially rollback
+                stayed_healthy, rollback_result = rollback_manager.monitor_and_rollback(
+                    asset_id=asset.id,
+                    release=asset_name,
+                    namespace=namespace,
+                    health_checker=health_checker,
+                    asset=asset
+                )
+
+                if stayed_healthy:
+                    console.print(f"[green]✓[/green] Update completed successfully!")
+                else:
+                    console.print(f"[red]✗[/red] Update failed - rolled back")
+                    if rollback_result:
+                        console.print(f"  Rollback: {rollback_result.message}")
+                    sys.exit(20)  # Health check failed exit code
+
+            except Exception as e:
+                console.print(f"[yellow]⚠[/yellow] Could not perform health checks: {e}")
+                console.print(f"[green]Update completed, but health monitoring skipped[/green]")
+    else:
+        console.print(f"[red]✗[/red] {result.message}")
+        if result.error:
+            console.print(f"  Error: {result.error}")
+        sys.exit(4)  # Update error exit code
+
+
+@cli.command()
+@click.argument('asset_name')
+@click.option('--namespace', '-n', default='default', help='Kubernetes namespace')
+@click.option('--revision', type=int, help='Specific revision to rollback to')
+@click.option('--to-version', help='Version to rollback to')
+@click.pass_context
+def rollback(ctx, asset_name, namespace, revision, to_version):
+    """Rollback a failed update."""
+    console.print(f"[bold yellow]Rolling back {asset_name}[/bold yellow]")
+
+    # Initialize Helm updater
+    try:
+        helm_updater = HelmUpdater()
+    except FileNotFoundError as e:
+        console.print(f"[red]✗[/red] {e}")
+        sys.exit(1)
+
+    # Get release history
+    console.print(f"\n[cyan]Fetching release history...[/cyan]")
+    history = helm_updater.get_release_history(asset_name, namespace, max_revisions=10)
+
+    if not history:
+        console.print(f"[red]✗[/red] No release history found for {asset_name}")
+        sys.exit(1)
+
+    # Display history
+    table = Table(title=f"Release History: {asset_name}")
+    table.add_column("Revision", style="cyan")
+    table.add_column("Updated", style="blue")
+    table.add_column("Status", style="green")
+    table.add_column("Chart", style="magenta")
+    table.add_column("App Version", style="yellow")
+
+    for rel in reversed(history):
+        table.add_row(
+            str(rel.revision),
+            rel.updated,
+            rel.status,
+            rel.chart,
+            rel.app_version
+        )
+
+    console.print(table)
+
+    # Execute rollback
+    console.print(f"\n[yellow]Executing rollback...[/yellow]")
+
+    result = helm_updater.rollback(
+        release=asset_name,
+        namespace=namespace,
+        revision=revision,
+        wait=True,
+        timeout=300
+    )
+
+    if result.success:
+        console.print(f"[green]✓[/green] {result.message}")
+        console.print(f"  New revision: {result.revision}")
+        console.print(f"  Duration: {result.duration_seconds:.1f}s")
+
+        # Update state
+        state_manager = StateManager()
+        state_manager.update_status(f"k8s-deployment-{namespace}-{asset_name}", "active")
+    else:
+        console.print(f"[red]✗[/red] {result.message}")
+        if result.error:
+            console.print(f"  Error: {result.error}")
+        sys.exit(5)  # Rollback error exit code
 
 
 def main():

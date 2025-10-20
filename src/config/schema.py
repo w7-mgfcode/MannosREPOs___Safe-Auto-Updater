@@ -123,12 +123,27 @@ class MonitoringConfig(BaseModel):
     log_level: str = Field(default="INFO")
 
 
+class APIServerConfig(BaseModel):
+    """REST API server configuration."""
+    enabled: bool = False
+    host: str = "0.0.0.0"
+    port: int = Field(default=8000, ge=1024, le=65535)
+    workers: int = Field(default=1, ge=1, le=16)
+    reload: bool = False
+    cors_origins: List[str] = Field(default_factory=lambda: ["*"])
+    api_key: Optional[str] = None
+    rate_limit_enabled: bool = False
+    rate_limit_requests: int = Field(default=100, ge=1)
+    rate_limit_window: int = Field(default=60, ge=1)  # seconds
+
+
 class SafeUpdaterConfig(BaseModel):
     """Main configuration for Safe Auto-Updater."""
     auto_update: AutoUpdateConfig = AutoUpdateConfig()
     docker: DockerConfig = DockerConfig()
     kubernetes: KubernetesConfig = KubernetesConfig()
     monitoring: MonitoringConfig = MonitoringConfig()
+    api_server: APIServerConfig = APIServerConfig()
 
     class Config:
         """Pydantic configuration."""

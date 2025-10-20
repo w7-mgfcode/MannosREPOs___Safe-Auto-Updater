@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from enum import Enum
 
 
@@ -40,6 +40,10 @@ class Asset:
     status: AssetStatus
     last_updated: str
     metadata: Dict[str, Any]
+    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    latest_version: Optional[str] = None
+    labels: Dict[str, str] = field(default_factory=dict)
+    updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
@@ -64,6 +68,7 @@ class StateManager:
         self.state_file = Path(state_file)
         self.assets: Dict[str, Asset] = {}
         self._load_state()
+        self._update_metrics()
 
     def _load_state(self):
         """Load state from disk."""
@@ -94,6 +99,38 @@ class StateManager:
         with open(self.state_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, default=str)
 
+    def _update_metrics(self):
+        """Update Prometheus metrics with current state."""
+        try:
+            from monitoring.prometheus_metrics import get_metrics_collector
+            
+            metrics = get_metrics_collector()
+            stats = self.get_statistics()
+            
+            # Update asset counts by type and namespace
+            by_namespace = {}
+            for asset in self.assets.values():
+                ns = asset.namespace or "default"
+                key = (asset.asset_type.value, ns)
+                by_namespace[key] = by_namespace.get(key, 0) + 1
+            
+            for (asset_type, namespace), count in by_namespace.items():
+                metrics.record_assets(asset_type, namespace, count)
+            
+            # Update asset counts by status
+            for status, count in stats['by_status'].items():
+                for asset_type in stats['by_type'].keys():
+                    # Get count for this specific combination
+                    status_type_count = len([
+                        a for a in self.assets.values()
+                        if a.status.value == status and a.asset_type.value == asset_type
+                    ])
+                    if status_type_count > 0:
+                        metrics.record_asset_status(status, asset_type, status_type_count)
+        except ImportError:
+            # Metrics module not available
+            pass
+
     def add_asset(self, asset: Asset) -> None:
         """
         Add or update an asset.
@@ -103,6 +140,7 @@ class StateManager:
         """
         self.assets[asset.id] = asset
         self._save_state()
+        self._update_metrics()
 
     def get_asset(self, asset_id: str) -> Optional[Asset]:
         """
@@ -129,6 +167,7 @@ class StateManager:
         if asset_id in self.assets:
             del self.assets[asset_id]
             self._save_state()
+            self._update_metrics()
             return True
         return False
 
@@ -177,7 +216,9 @@ class StateManager:
         if asset:
             asset.status = status
             asset.last_updated = datetime.utcnow().isoformat()
+            asset.updated_at = datetime.utcnow().isoformat()
             self._save_state()
+            self._update_metrics()
             return True
         return False
 
@@ -196,7 +237,9 @@ class StateManager:
         if asset:
             asset.current_version = new_version
             asset.last_updated = datetime.utcnow().isoformat()
+            asset.updated_at = datetime.utcnow().isoformat()
             self._save_state()
+            self._update_metrics()
             return True
         return False
 
@@ -210,13 +253,17 @@ class StateManager:
         total = len(self.assets)
         by_type = {}
         by_status = {}
+        by_namespace = {}
 
         for asset in self.assets.values():
             by_type[asset.asset_type.value] = by_type.get(asset.asset_type.value, 0) + 1
             by_status[asset.status.value] = by_status.get(asset.status.value, 0) + 1
+            ns = asset.namespace or "default"
+            by_namespace[ns] = by_namespace.get(ns, 0) + 1
 
         return {
             'total_assets': total,
             'by_type': by_type,
-            'by_status': by_status
+            'by_status': by_status,
+            'by_namespace': by_namespace
         }
