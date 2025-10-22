@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  safe-auto-updater:
+    image: safe-auto-updater:latest
+    container_name: safe-auto-updater
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./configs:/app/configs
+      - ./logs:/app/logs
+    environment:
+      - LOG_LEVEL=INFO
+      - CONFIG_PATH=/app/configs/config.yaml
+    restart: unless-stopped
+    networks:
+      - updater-network
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_INCLUDE_STOPPED=false
+      - WATCHTOWER_SCHEDULE=0 0 * * *
+      - WATCHTOWER_HTTP_API_TOKEN=secret-token
+      - WATCHTOWER_HTTP_API_UPDATE=true
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    networks:
+      - updater-network
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+
+networks:
+  updater-network:
+    driver: bridge
