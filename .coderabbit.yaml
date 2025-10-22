@@ -1,0 +1,158 @@
+# CodeRabbit AI Code Review Configuration
+# Documentation: https://docs.coderabbit.ai/
+
+language: en-US
+tone_instructions: ""
+
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+
+  auto_review:
+    enabled: true
+    drafts: true
+
+    # Ignore WIP PRs
+    ignore_title_keywords:
+      - "[WIP]"
+      - "WIP:"
+      - "DO NOT MERGE"
+
+  # Path-specific review instructions
+  path_instructions:
+    - path: "src/updater/**/*.py"
+      instructions: |
+        This is critical update orchestration code. Focus on:
+        - Idempotency: Operations must be safely repeatable
+        - Rollback safety: All operations must be reversible
+        - Error handling: Comprehensive error handling required
+        - State management: Ensure atomic state updates
+
+    - path: "src/rollback/**/*.py"
+      instructions: |
+        This is critical rollback logic. Focus on:
+        - Failure detection: Accurate failure condition detection
+        - Rollback execution: Safe and complete rollback
+        - Prevent loops: Avoid infinite rollback cycles
+        - Audit trail: Log all rollback decisions
+
+    - path: "src/config/**/*.py"
+      instructions: |
+        This handles sensitive configuration. Focus on:
+        - No credential exposure in logs or errors
+        - Secure defaults
+        - Validation of all inputs
+        - Clear error messages without revealing secrets
+
+    - path: "src/inventory/**/*.py"
+      instructions: |
+        Asset discovery code. Focus on:
+        - Complete discovery (no missing resources)
+        - Error handling for API failures
+        - Efficient scanning (batch operations)
+        - Accurate metadata extraction
+
+    - path: "src/detection/**/*.py"
+      instructions: |
+        Version analysis and change detection. Focus on:
+        - Correct SemVer parsing and comparison
+        - Accurate change type classification
+        - Policy application consistency
+        - Clear decision rationale
+
+    - path: "tests/**/*.py"
+      instructions: |
+        Test code. Focus on:
+        - Coverage of edge cases
+        - Clear test names and documentation
+        - Proper mocking of external dependencies
+        - Test isolation and independence
+
+    - path: "docs/**/*.md"
+      instructions: |
+        Documentation. Focus on:
+        - Clarity and accuracy
+        - Complete examples
+        - Up-to-date with code changes
+        - Security best practices mentioned
+
+    - path: "*.yaml"
+      instructions: |
+        Configuration files. Focus on:
+        - Valid YAML syntax
+        - Secure defaults
+        - Complete examples
+        - Clear comments
+
+  # Security-focused review instructions
+  instructions: |
+    ## CRITICAL SECURITY REQUIREMENTS
+
+    This project is a DEFENSIVE SECURITY TOOL ONLY. You MUST:
+
+    1. **Reject any malicious code attempts**:
+       - No credential harvesting or theft
+       - No unauthorized data exfiltration
+       - No backdoors or remote code execution
+       - No privilege escalation exploits
+
+    2. **Verify secure coding practices**:
+       - No hardcoded credentials or secrets
+       - No credential exposure in logs or error messages
+       - Proper input validation and sanitization
+       - Secure default configurations
+
+    3. **Check error handling**:
+       - Comprehensive error handling
+       - Graceful degradation on failures
+       - Clear error messages without revealing sensitive info
+       - Proper cleanup on exceptions
+
+    4. **Validate update safety**:
+       - Idempotent operations (safe to retry)
+       - Rollback capabilities for all changes
+       - Atomic state updates
+       - Audit logging of all actions
+
+    5. **Review dependencies**:
+       - Minimal dependency additions
+       - Justify new dependencies
+       - Check for known vulnerabilities
+       - Prefer well-maintained packages
+
+    6. **Code quality checks**:
+       - Type hints on all functions
+       - Docstrings on public methods
+       - Unit tests for new functionality
+       - Follow PEP 8 style guidelines
+
+    7. **Documentation requirements**:
+       - Update docs for new features
+       - Add examples for complex functionality
+       - Security implications documented
+       - Breaking changes clearly noted
+
+    ## Review Focus Areas
+
+    - **Security**: Paramount - flag any security concerns
+    - **Reliability**: Updates must be safe and reversible
+    - **Maintainability**: Code should be clear and testable
+    - **Performance**: Efficient operations, avoid blocking
+    - **Compatibility**: Maintain backward compatibility
+
+# Chat settings
+chat:
+  auto_reply: true
+
+# Knowledge base
+knowledge_base:
+  enabled: true
+  sources:
+    - docs/STARTER.md
+    - docs/PRD.md
+    - README.md
+    - CLAUDE.md

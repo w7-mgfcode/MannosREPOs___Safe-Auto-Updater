@@ -1,0 +1,53 @@
+# Safe Auto-Updater Default Policy Configuration
+
+auto_update:
+  update_policy:
+    enabled: true
+    max_concurrent: 3
+    update_window: "02:00-06:00"  # Updates only between 2 AM and 6 AM
+    dry_run: false
+
+  semver_gates:
+    patch: auto        # Auto-approve patch updates (1.0.0 -> 1.0.1)
+    minor: review      # Review minor updates (1.0.0 -> 1.1.0)
+    major: manual      # Manual approval for major updates (1.0.0 -> 2.0.0)
+    prerelease: manual # Manual approval for pre-releases (1.0.0-alpha)
+
+  health_checks:
+    - type: http
+      http:
+        endpoint: /health
+        timeout: 30
+        retries: 3
+        expected_status: 200
+        method: GET
+
+    - type: kubernetes
+      # Uses Kubernetes readiness/liveness probes
+
+  rollback:
+    auto_rollback: true
+    failure_threshold: 0.1  # Rollback if >10% of pods fail
+    monitoring_duration: 300  # Monitor for 5 minutes post-update
+    max_rollback_attempts: 3
+
+docker:
+  socket_path: /var/run/docker.sock
+  watchtower_enabled: false
+  watchtower_endpoint: null
+  # registry_credentials:
+  #   registry.example.com:
+  #     username: user
+  #     password: pass
+
+kubernetes:
+  kubeconfig_path: null  # Uses default kubeconfig or in-cluster config
+  namespace: default
+  in_cluster: false
+  service_account: null
+
+monitoring:
+  prometheus_enabled: true
+  prometheus_port: 9090
+  metrics_path: /metrics
+  log_level: INFO
