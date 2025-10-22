@@ -1,0 +1,54 @@
+# Default values for safe-auto-updater Helm chart
+
+replicaCount: 1
+
+image:
+  repository: safe-auto-updater
+  pullPolicy: Always
+  tag: "latest"
+
+serviceAccount:
+  create: true
+  name: safe-auto-updater
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+config:
+  inventory:
+    docker:
+      enabled: true
+      scan_interval: 300
+    kubernetes:
+      enabled: true
+      namespaces:
+        - default
+      scan_interval: 300
+    helm:
+      enabled: true
+
+  detection:
+    semver:
+      auto_update_patch: true
+      auto_update_minor: false
+      auto_update_major: false
+
+  execution:
+    health_checks:
+      enabled: true
+      retry_count: 3
+      retry_delay: 5
+
+logging:
+  level: INFO
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

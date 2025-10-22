@@ -1,0 +1,64 @@
+# Safe Auto-Updater Configuration
+
+# Inventory settings
+inventory:
+  docker:
+    enabled: true
+    scan_interval: 300  # seconds
+  kubernetes:
+    enabled: true
+    namespaces:
+      - default
+      - production
+    scan_interval: 300
+  helm:
+    enabled: true
+    namespaces:
+      - default
+      - production
+
+# Detection settings
+detection:
+  semver:
+    auto_update_patch: true
+    auto_update_minor: false
+    auto_update_major: false
+  diff_gates:
+    enabled: true
+    max_risk_level: "medium"
+    critical_keys:
+      - security
+      - authentication
+      - database
+
+# Execution settings
+execution:
+  health_checks:
+    enabled: true
+    retry_count: 3
+    retry_delay: 5
+    timeout: 60
+  rollback:
+    enabled: true
+    auto_rollback_on_failure: true
+  helm:
+    namespace: default
+    timeout: 300
+  watchtower:
+    enabled: true
+    api_url: null
+
+# Notification settings (optional)
+notifications:
+  enabled: false
+  slack:
+    webhook_url: null
+  email:
+    smtp_server: null
+    from_address: null
+    to_addresses: []
+
+# Logging settings
+logging:
+  level: INFO
+  file: /var/log/safe-auto-updater.log
