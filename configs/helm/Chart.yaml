@@ -1,0 +1,17 @@
+apiVersion: v2
+name: safe-auto-updater
+description: A Helm chart for Safe Auto-Updater system
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - updater
+  - docker
+  - kubernetes
+  - automation
+home: https://github.com/w7-mgfcode/MannosREPOs___Safe-Auto-Updater
+sources:
+  - https://github.com/w7-mgfcode/MannosREPOs___Safe-Auto-Updater
+maintainers:
+  - name: Safe Auto-Updater Team
+    email: team@example.com
